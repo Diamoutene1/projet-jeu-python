@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeux</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #ff5722;
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #1e1e1e;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        #game-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #333;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        canvas {
+            border: 2px solid #ffffff;
+            background-color: #000000;
+        }
+
+        #gol-controls, #snake-controls {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .control-button {
+            background-color: #333;
+            color: #ffffff;
+            border: none;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .control-button:hover {
+            background-color: #555;
+        }
+
+        .stats {
+            margin-top: 10px;
+            font-size: 18px;
+        }
+
+        footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #888888;
+        }
+
+        #welcome-message {
+            display: none;
+            color: #00FF00;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Jeux</h1>
+    </header>
+    <div class="container">
+        <div id="game-selector">
+            <button onclick="showGame('game-of-life')">Jeu de la Vie</button>
+            <button onclick="showGame('snake-game')">Jeu de Snake</button>
+        </div>
+
+        <!-- Zone pour le Jeu de la Vie -->
+        <div id="game-of-life" class="section">
+            <h2>Jeu de la Vie</h2>
+            <canvas id="gol-canvas" width="400" height="400"></canvas>
+            <div id="gol-controls">
+                <button class="control-button" onclick="toggleGame()">Démarrer/Arrêter</button>
+                <button class="control-button" onclick="resetGame()">Réinitialiser</button>
+                <button class="control-button" onclick="changeSpeed()">Vitesse: Normale</button>
+                <button class="control-button" onclick="pauseGame()">Pause</button>
+            </div>
+            <div id="gol-stats" class="stats"></div>
+        </div>
+
+        <!-- Zone pour le Jeu de Snake -->
+        <div id="snake-game" class="section">
+            <h2>Jeu de Snake</h2>
+            <canvas id="snake-canvas" width="400" height="400"></canvas>
+            <div id="snake-controls">
+                <button class="control-button" onclick="changeDirection('UP')">↑</button>
+                <button class="control-button" onclick="changeDirection('LEFT')">←</button>
+                <button class="control-button" onclick="changeDirection('RIGHT')">→</button>
+                <button class="control-button" onclick="changeDirection('DOWN')">↓</button>
+                <button class="control-button" onclick="restartGame()">Redémarrer</button>
+            </div>
+            <div id="snake-stats" class="stats"></div>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2024 Zana Diamoutene. Tous droits réservés.
+    </footer>
+
+    <div id="welcome-message">Bienvenue dans le Jeu de Snake !</div>
+
+    <script>
+        // Fonction pour afficher la section sélectionnée
+        function showGame(gameId) {
+            document.getElementById('game-of-life').style.display = gameId === 'game-of-life' ? 'block' : 'none';
+            document.getElementById('snake-game').style.display = gameId === 'snake-game' ? 'block' : 'none';
+        }
+
+        // Jeu de la Vie de Conway
+        class ConwayGame {
+            constructor(canvasId, statsId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.stats = document.getElementById(statsId);
+                this.width = this.canvas.width / 20;
+                this.height = this.canvas.height / 20;
+                this.grid = this.createGrid();
+                this.running = false;
+                this.interval = 100;
+                this.drawGrid();
+                this.canvas.addEventListener('click', this.handleClick.bind(this));
+                document.querySelector('#gol-controls button:nth-child(1)').addEventListener('click', this.toggleGame.bind(this));
+                document.querySelector('#gol-controls button:nth-child(2)').addEventListener('click', this.resetGame.bind(this));
+                document.querySelector('#gol-controls button:nth-child(3)').addEventListener('click', this.changeSpeed.bind(this));
+                document.querySelector('#gol-controls button:nth-child(4)').addEventListener('click', this.pauseGame.bind(this));
+                this.initializeRandomGrid();
+            }
+
+            createGrid() {
+                return Array.from({ length: this.width }, () => Array.from({ length: this.height }, () => Math.random() < 0.5 ? 1 : 0));
+            }
+
+            drawGrid() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                for (let x = 0; x < this.width; x++) {
+                    for (let y = 0; y < this.height; y++) {
+                        this.ctx.fillStyle = this.grid[x][y] === 1 ? '#00FF00' : '#000000';
+                        this.ctx.fillRect(x * 20, y * 20, 20, 20);
+                    }
+                }
+                this.updateStats();
+            }
+
+            handleClick(event) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = Math.floor((event.clientX - rect.left) / 20);
+                const y = Math.floor((event.clientY - rect.top) / 20);
+                this.grid[x][y] = this.grid[x][y] === 1 ? 0 : 1;
+                this.drawGrid();
+            }
+
+            toggleGame() {
+                this.running = !this.running;
+                if (this.running) {
+                    this.gameInterval = setInterval(this.step.bind(this), this.interval);
+                } else {
+                    clearInterval(this.gameInterval);
+                }
+            }
+
+            resetGame() {
+                this.grid = this.createGrid();
+                this.drawGrid();
+            }
+
+            changeSpeed() {
+                this.interval = this.interval === 100 ? 50 : 100;
+                if (this.running) {
+                    clearInterval(this.gameInterval);
+                    this.gameInterval = setInterval(this.step.bind(this), this.interval);
+                }
+                document.querySelector('#gol-controls button:nth-child(3)').textContent = `Vitesse: ${this.interval === 50 ? 'Rapide' : 'Normale'}`;
+            }
+
+            pauseGame() {
+                if (this.running) {
+                    this.toggleGame();
+                    document.querySelector('#gol-controls button:nth-child(4)').textContent = 'Reprendre';
+                } else {
+                    this.toggleGame();
+                    document.querySelector('#gol-controls button:nth-child(4)').textContent = 'Pause';
+                }
+            }
+
+            step() {
+                const newGrid = this.createGrid();
+                let changes = 0;
+                for (let x = 0; x < this.width; x++) {
+                    for (let y = 0; y < this.height; y++) {
+                        const aliveNeighbors = this.countAliveNeighbors(x, y);
+                        if (this.grid[x][y] === 1) {
+                            newGrid[x][y] = aliveNeighbors === 2 || aliveNeighbors === 3 ? 1 : 0;
+                        } else {
+                            newGrid[x][y] = aliveNeighbors === 3 ? 1 : 0;
+                        }
+                        if (newGrid[x][y] !== this.grid[x][y]) changes++;
+                    }
+                }
+                this.grid = newGrid;
+                this.drawGrid();
+                if (changes === 0) {
+                    this.toggleGame();
+                }
+            }
+
+            countAliveNeighbors(x, y) {
+                const directions = [
+                    [-1, -1], [-1, 0], [-1, 1],
+                    [0, -1],          [0, 1],
+                    [1, -1], [1, 0], [1, 1]
+                ];
+                let count = 0;
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && ny >= 0 && nx < this.width && ny < this.height && this.grid[nx][ny] === 1) {
+                        count++;
+                    }
+                }
+                return count;
+            }
+
+            initializeRandomGrid() {
+                this.grid = this.createGrid();
+                this.drawGrid();
+            }
+
+            updateStats() {
+                const aliveCount = this.grid.flat().filter(cell => cell === 1).length;
+                const deadCount = this.grid.flat().filter(cell => cell === 0).length;
+                this.stats.textContent = `Vivants: ${aliveCount}, Morts: ${deadCount}`;
+            }
+        }
+
+        // Jeu de Snake
+        class SnakeGame {
+            constructor(canvasId, statsId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.stats = document.getElementById(statsId);
+                this.cellSize = 20;
+                this.width = this.canvas.width / this.cellSize;
+                this.height = this.canvas.height / this.cellSize;
+                this.snake = [{ x: 10, y: 10 }];
+                this.food = { x: Math.floor(Math.random() * this.width), y: Math.floor(Math.random() * this.height) };
+                this.direction = 'RIGHT';
+                this.running = true;
+                this.score = 0;
+                this.intervalId = setInterval(this.update.bind(this), 200);
+                document.addEventListener('keydown', this.changeDirection.bind(this));
+                document.querySelector('#snake-controls button:nth-child(5)').addEventListener('click', this.restartGame.bind(this));
+                this.showWelcomeMessage();
+            }
+
+            draw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillStyle = 'green';
+                for (let segment of this.snake) {
+                    this.ctx.fillRect(segment.x * this.cellSize, segment.y * this.cellSize, this.cellSize, this.cellSize);
+                }
+                this.ctx.fillStyle = 'red';
+                this.ctx.fillRect(this.food.x * this.cellSize, this.food.y * this.cellSize, this.cellSize, this.cellSize);
+                this.stats.textContent = `Score: ${this.score}`;
+            }
+
+            update() {
+                const head = { ...this.snake[0] };
+                if (this.direction === 'UP') head.y--;
+                if (this.direction === 'DOWN') head.y++;
+                if (this.direction === 'LEFT') head.x--;
+                if (this.direction === 'RIGHT') head.x++;
+
+                if (head.x < 0 || head.x >= this.width || head.y < 0 || head.y >= this.height || this.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                    this.gameOver();
+                    return;
+                }
+
+                this.snake.unshift(head);
+
+                if (head.x === this.food.x && head.y === this.food.y) {
+                    this.score++;
+                    this.food = { x: Math.floor(Math.random() * this.width), y: Math.floor(Math.random() * this.height) };
+                } else {
+                    this.snake.pop();
+                }
+
+                this.draw();
+            }
+
+            changeDirection(event) {
+                if (event.key === 'ArrowUp' && this.direction !== 'DOWN') this.direction = 'UP';
+                if (event.key === 'ArrowDown' && this.direction !== 'UP') this.direction = 'DOWN';
+                if (event.key === 'ArrowLeft' && this.direction !== 'RIGHT') this.direction = 'LEFT';
+                if (event.key === 'ArrowRight' && this.direction !== 'LEFT') this.direction = 'RIGHT';
+            }
+
+            restartGame() {
+                this.snake = [{ x: 10, y: 10 }];
+                this.food = { x: Math.floor(Math.random() * this.width), y: Math.floor(Math.random() * this.height) };
+                this.direction = 'RIGHT';
+                this.score = 0;
+                this.running = true;
+                clearInterval(this.intervalId);
+                this.intervalId = setInterval(this.update.bind(this), 200);
+                this.draw();
+            }
+
+            gameOver() {
+                this.running = false;
+                clearInterval(this.intervalId);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillStyle = 'red';
+                this.ctx.font = '24px Arial';
+                this.ctx.fillText('Game Over', this.canvas.width / 2 - 60, this.canvas.height / 2);
+            }
+
+            showWelcomeMessage() {
+                document.getElementById('welcome-message').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('welcome-message').style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Initialisation des jeux et affichage de la section par défaut
+        function init() {
+            new ConwayGame('gol-canvas', 'gol-stats');
+            new SnakeGame('snake-canvas', 'snake-stats');
+            showGame('game-of-life'); // Affiche le Jeu de la Vie par défaut
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
